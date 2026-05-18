@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>Acerto Rosa Viagem</title>
+    <title>Acerto Rosa Viagem - Sync Supabase</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); margin: 0; padding: 8px; font-family: system-ui, 'Segoe UI', 'Roboto', sans-serif; }
@@ -18,13 +20,12 @@
         .summary-card h4 { font-size: 0.6rem; color: #9f7aea; margin-bottom: 3px; }
         .summary-card .value { font-size: 1.1rem; font-weight: 800; color: #1f2937; }
         .summary-card .sub { font-size: 0.55rem; color: #6b7280; }
-        .action-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 1rem 0; }
+        .action-bar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 1rem 0; }
         .action-btn { padding: 12px 4px; border-radius: 12px; font-weight: 700; font-size: 0.7rem; cursor: pointer; border: none; transition: 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; gap: 5px; }
-        .btn-whatsapp { background: #25D366; color: white; }
-        .btn-print { background: #6c5ce7; color: white; }
-        .btn-backup { background: #00b894; color: white; }
+        .btn-login { background: #4285f4; color: white; }
+        .btn-logout { background: #6c5ce7; color: white; }
+        .btn-sync { background: #00b894; color: white; }
         .btn-clear { background: #e74c3c; color: white; }
-        .file-input-label { background: #f39c12; color: white; padding: 12px 4px; border-radius: 12px; font-size: 0.7rem; cursor: pointer; font-weight: 700; text-align: center; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .section-title { font-size: 0.8rem; font-weight: 700; margin: 0.8rem 0 0.5rem 0; color: #be185d; border-left: 4px solid #ec4899; padding-left: 8px; }
         .form-section { background: #ffffff; border: 1px solid #ffe0f0; border-radius: 16px; padding: 0.8rem; margin-bottom: 1rem; }
         .form-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
@@ -44,14 +45,17 @@
         .edit-btn, .delete-btn { background: none; border: none; font-size: 1rem; cursor: pointer; padding: 2px 5px; border-radius: 8px; }
         .edit-btn { color: #f59e0b; }
         .delete-btn { color: #f472b6; }
+        .login-area { background: #fff0f5; border-radius: 16px; padding: 1rem; text-align: center; margin-bottom: 1rem; }
+        .user-email { font-size: 0.7rem; color: #be185d; margin-top: 5px; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: white; padding: 1.5rem; border-radius: 20px; max-width: 350px; width: 90%; }
         .modal-content h3 { margin-bottom: 1rem; color: #be185d; }
         .modal-content input, .modal-content select { margin-bottom: 0.8rem; }
         .modal-buttons { display: flex; gap: 10px; margin-top: 1rem; }
         .modal-buttons button { flex: 1; }
+        .sync-status { font-size: 0.6rem; color: #00b894; text-align: center; margin-top: 5px; }
         @media (max-width: 550px) {
-            .action-btn, .file-input-label { font-size: 0.6rem; padding: 10px 2px; }
+            .action-btn { font-size: 0.6rem; padding: 10px 2px; }
             .summary-card .value { font-size: 0.9rem; }
         }
     </style>
@@ -61,54 +65,67 @@
     <div class="header">
         <h1>🌸 Acerto Rosa Viagem</h1>
         <p>Controle de empréstimos: £ GBP ou R$ BRL · Pagamentos ao cunhado</p>
-        <div class="badge-info">💡 Dados salvos + Backup | Sincronia com Google Drive (pasta Downloads)</div>
+        <div class="badge-info">💡 Versão Supabase - Sincronia automática em tempo real!</div>
     </div>
     <div class="content">
-        <div class="summary-grid" id="summaryGrid"></div>
-        <div class="action-bar">
-            <button class="action-btn btn-whatsapp" id="whatsappBtn">📱 WhatsApp</button>
-            <button class="action-btn btn-print" id="printBtn">🖨️ Imprimir</button>
-            <button class="action-btn btn-backup" id="backupBtn">💾 Backup</button>
-            <label class="file-input-label" for="restoreFile">📂 Restaurar</label>
-            <input type="file" id="restoreFile" accept=".json" style="display:none">
-            <button class="action-btn btn-clear" id="clearAllBtn">🗑️ Limpar</button>
-        </div>
-        <div class="section-title">💰 Adicionar Empréstimo (você emprestou à sogra)</div>
-        <div class="form-section">
-            <div class="form-grid">
-                <div class="input-group"><label>Moeda</label><select id="loanCurrency"><option value="GBP">🇬🇧 £</option><option value="BRL">🇧🇷 R$</option></select></div>
-                <div class="input-group"><label>Valor</label><input type="number" id="loanAmount" step="0.01" placeholder="0.00"></div>
-                <div class="input-group"><label>Descrição</label><input type="text" id="loanDesc" placeholder="Motivo"></div>
-                <div class="input-group"><label>Data</label><input type="date" id="loanDate"></div>
-                <div class="input-group"><button id="addLoanBtn">➕ Adicionar</button></div>
+        <!-- Área de Login -->
+        <div class="login-area" id="loginArea">
+            <div id="userInfo">
+                <button class="action-btn btn-login" id="loginBtn" style="width: auto; display: inline-flex;">🔐 Entrar com Google</button>
             </div>
+            <div id="userEmail" class="user-email"></div>
         </div>
-        <div class="section-title">💸 Pagamento (sogra pagou em REAIS ao cunhado)</div>
-        <div class="form-section">
-            <div class="form-grid">
-                <div class="input-group"><label>Valor (R$)</label><input type="number" id="paymentAmount" step="0.01" placeholder="0.00"></div>
-                <div class="input-group"><label>Descrição</label><input type="text" id="paymentDesc" placeholder="Ex: parcela 1"></div>
-                <div class="input-group"><label>Data</label><input type="date" id="paymentDate"></div>
-                <div class="input-group"><button id="addPaymentBtn">💵 Adicionar</button></div>
+
+        <div id="appContent" style="display: none;">
+            <div class="summary-grid" id="summaryGrid"></div>
+            
+            <div class="action-bar">
+                <button class="action-btn btn-sync" id="syncBtn">🔄 Sincronizar</button>
+                <button class="action-btn btn-logout" id="logoutBtn">🚪 Sair</button>
             </div>
-        </div>
-        <div style="background: #fff5f9; border-radius: 12px; padding: 0.5rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between;">
-            <span style="font-size:0.7rem; font-weight:600;">💱 GBP → BRL:</span>
-            <input type="number" id="exchangeRate" step="0.01" value="6.80" style="width: 80px;">
-            <button id="applyRateBtn" style="width: auto; padding: 4px 10px;">Atualizar</button>
-        </div>
-        <div class="section-title">📋 Extrato completo</div>
-        <div style="overflow-x: auto;">
-            <table style="width:100%">
-                <thead><tr><th>Tipo</th><th>Valor</th><th>Descrição</th><th>Data</th><th>Ações</th></tr></thead>
-                <tbody id="transactionsBody"><tr><td colspan="5" style="text-align:center;">✨ Nenhum registro ✨</td></tr></tbody>
-            </table>
-        </div>
-        <div style="text-align:center; font-size:0.55rem; color:#aaa; margin-top:0.8rem;">
-            ✅ Backup salva na pasta Downloads (raiz) - sincroniza com Google Drive
+            <div id="syncStatus" class="sync-status">✅ Sincronizado</div>
+
+            <div class="section-title">💰 Adicionar Empréstimo (você emprestou à sogra)</div>
+            <div class="form-section">
+                <div class="form-grid">
+                    <div class="input-group"><label>Moeda</label><select id="loanCurrency"><option value="GBP">🇬🇧 £</option><option value="BRL">🇧🇷 R$</option></select></div>
+                    <div class="input-group"><label>Valor</label><input type="number" id="loanAmount" step="0.01" placeholder="0.00"></div>
+                    <div class="input-group"><label>Descrição</label><input type="text" id="loanDesc" placeholder="Motivo"></div>
+                    <div class="input-group"><label>Data</label><input type="date" id="loanDate"></div>
+                    <div class="input-group"><button id="addLoanBtn">➕ Adicionar</button></div>
+                </div>
+            </div>
+
+            <div class="section-title">💸 Pagamento (sogra pagou em REAIS ao cunhado)</div>
+            <div class="form-section">
+                <div class="form-grid">
+                    <div class="input-group"><label>Valor (R$)</label><input type="number" id="paymentAmount" step="0.01" placeholder="0.00"></div>
+                    <div class="input-group"><label>Descrição</label><input type="text" id="paymentDesc" placeholder="Ex: parcela 1"></div>
+                    <div class="input-group"><label>Data</label><input type="date" id="paymentDate"></div>
+                    <div class="input-group"><button id="addPaymentBtn">💵 Adicionar</button></div>
+                </div>
+            </div>
+
+            <div style="background: #fff5f9; border-radius: 12px; padding: 0.5rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between;">
+                <span style="font-size:0.7rem; font-weight:600;">💱 GBP → BRL:</span>
+                <input type="number" id="exchangeRate" step="0.01" value="6.80" style="width: 80px;">
+                <button id="applyRateBtn" style="width: auto; padding: 4px 10px;">Atualizar</button>
+            </div>
+
+            <div class="section-title">📋 Extrato completo</div>
+            <div style="overflow-x: auto;">
+                <table style="width:100%">
+                    <thead><tr><th>Tipo</th><th>Valor</th><th>Descrição</th><th>Data</th><th>Ações</th></tr></thead>
+                    <tbody id="transactionsBody"><tr><td colspan="5" style="text-align:center;">✨ Faça login para ver seus dados ✨</td></tr></tbody>
+                </table>
+            </div>
+            <div style="text-align:center; font-size:0.55rem; color:#aaa; margin-top:0.8rem;">
+                ✅ Dados salvos na nuvem | Sincronia automática entre dispositivos
+            </div>
         </div>
     </div>
 </div>
+
 <div id="editModal" class="modal">
     <div class="modal-content">
         <h3>✏️ Editar registro</h3>
@@ -120,64 +137,175 @@
         <div class="modal-buttons"><button id="saveEditBtn">💾 Salvar</button><button id="cancelEditBtn" style="background:#95a5a6;">Cancelar</button></div>
     </div>
 </div>
+
 <script>
+    // Supabase configuration
+    const SUPABASE_URL = 'https://vpumxmewnmnoabhyprwu.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_zQ2XLFy50ymCQTasNJBYNg_bcM1Nax9';
+    
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    let currentUser = null;
     let transactions = [];
     let exchangeRate = 6.80;
     let currentEditId = null;
+    
+    // Elementos
     const summaryGrid = document.getElementById('summaryGrid');
     const transactionsBody = document.getElementById('transactionsBody');
     const exchangeRateInput = document.getElementById('exchangeRate');
+    const loginArea = document.getElementById('loginArea');
+    const appContent = document.getElementById('appContent');
+    const userEmailDiv = document.getElementById('userEmail');
+    const syncStatus = document.getElementById('syncStatus');
     const editModal = document.getElementById('editModal');
-    const editTipo = document.getElementById('editTipo');
-    const editMoeda = document.getElementById('editMoeda');
-    const editValor = document.getElementById('editValor');
-    const editDesc = document.getElementById('editDesc');
-    const editData = document.getElementById('editData');
-
-    function loadData() {
-        const saved = localStorage.getItem('acertoRosaViagem');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                transactions = parsed.transactions || [];
-                exchangeRate = parsed.exchangeRate || 6.80;
-                exchangeRateInput.value = exchangeRate;
-            } catch(e) {}
+    
+    // Funções de autenticação
+    async function loginWithGoogle() {
+        try {
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin + window.location.pathname
+                }
+            });
+            if (error) throw error;
+        } catch (error) {
+            console.error('Erro no login:', error);
+            alert('Erro ao fazer login: ' + error.message);
+        }
+    }
+    
+    async function logout() {
+        await supabase.auth.signOut();
+        currentUser = null;
+        transactions = [];
+        showLoginScreen();
+        renderTable();
+        renderSummary();
+    }
+    
+    async function loadUserData() {
+        if (!currentUser) return;
+        
+        // Carregar taxa de câmbio
+        const { data: rateData } = await supabase
+            .from('user_settings')
+            .select('exchange_rate')
+            .eq('user_id', currentUser.id)
+            .single();
+        
+        if (rateData) {
+            exchangeRate = rateData.exchange_rate;
+            exchangeRateInput.value = exchangeRate;
+        }
+        
+        // Carregar transações
+        const { data: transactionsData, error } = await supabase
+            .from('transactions')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .order('data', { ascending: false });
+        
+        if (error) throw error;
+        
+        transactions = transactionsData || [];
+        renderAll();
+        updateSyncStatus('✅ Sincronizado');
+    }
+    
+    async function addTransaction(transaction) {
+        if (!currentUser) return;
+        
+        updateSyncStatus('🔄 Salvando...');
+        
+        const { data, error } = await supabase
+            .from('transactions')
+            .insert([{
+                ...transaction,
+                user_id: currentUser.id
+            }])
+            .select();
+        
+        if (error) throw error;
+        
+        transactions.unshift(data[0]);
+        renderAll();
+        updateSyncStatus('✅ Salvo na nuvem');
+        setTimeout(() => updateSyncStatus('✅ Sincronizado'), 2000);
+    }
+    
+    async function updateTransaction(id, updates) {
+        if (!currentUser) return;
+        
+        updateSyncStatus('🔄 Atualizando...');
+        
+        const { error } = await supabase
+            .from('transactions')
+            .update(updates)
+            .eq('id', id)
+            .eq('user_id', currentUser.id);
+        
+        if (error) throw error;
+        
+        const index = transactions.findIndex(t => t.id === id);
+        if (index !== -1) {
+            transactions[index] = { ...transactions[index], ...updates };
         }
         renderAll();
+        updateSyncStatus('✅ Atualizado na nuvem');
+        setTimeout(() => updateSyncStatus('✅ Sincronizado'), 2000);
     }
-    function saveToLocal() { localStorage.setItem('acertoRosaViagem', JSON.stringify({ transactions, exchangeRate })); }
-    function backupData() {
-        const data = { transactions, exchangeRate, backupDate: new Date().toISOString() };
-        const dataStr = JSON.stringify(data, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `acerto_rosa_backup_${new Date().toISOString().slice(0,19)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        alert('✅ Backup salvo! O arquivo está na pasta Downloads. O DriveSync vai enviar para o Google Drive automaticamente.');
+    
+    async function deleteTransactionFromCloud(id) {
+        if (!currentUser) return;
+        
+        updateSyncStatus('🔄 Excluindo...');
+        
+        const { error } = await supabase
+            .from('transactions')
+            .delete()
+            .eq('id', id)
+            .eq('user_id', currentUser.id);
+        
+        if (error) throw error;
+        
+        transactions = transactions.filter(t => t.id !== id);
+        renderAll();
+        updateSyncStatus('✅ Excluído da nuvem');
+        setTimeout(() => updateSyncStatus('✅ Sincronizado'), 2000);
     }
-    function restoreFromFile(file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const restored = JSON.parse(e.target.result);
-                if (restored.transactions !== undefined) {
-                    transactions = restored.transactions;
-                    exchangeRate = restored.exchangeRate || 6.80;
-                    exchangeRateInput.value = exchangeRate;
-                    saveToLocal();
-                    renderAll();
-                    alert('✅ Dados restaurados com sucesso!');
-                } else alert('❌ Arquivo inválido');
-            } catch(err) { alert('❌ Erro ao ler arquivo'); }
-        };
-        reader.readAsText(file);
+    
+    async function saveExchangeRate(rate) {
+        if (!currentUser) return;
+        
+        await supabase
+            .from('user_settings')
+            .upsert({
+                user_id: currentUser.id,
+                exchange_rate: rate
+            });
     }
+    
+    // UI Functions
+    function showLoginScreen() {
+        loginArea.style.display = 'block';
+        appContent.style.display = 'none';
+        userEmailDiv.innerHTML = '';
+    }
+    
+    function showAppScreen() {
+        loginArea.style.display = 'block';
+        appContent.style.display = 'block';
+        if (currentUser) {
+            userEmailDiv.innerHTML = `👤 ${currentUser.email}`;
+        }
+    }
+    
+    function updateSyncStatus(message) {
+        if (syncStatus) syncStatus.textContent = message;
+    }
+    
     function getStats() {
         let totalGBP = 0, totalBRL = 0, totalPago = 0;
         for (let t of transactions) {
@@ -191,8 +319,10 @@
         const saldo = totalGeral - totalPago;
         return { totalGBP, totalBRL, totalPago, gbpEmBRL, totalGeral, saldo: saldo > 0 ? saldo : 0 };
     }
+    
     function renderSummary() {
         const s = getStats();
+        if (!summaryGrid) return;
         summaryGrid.innerHTML = `
             <div class="summary-card"><h4>🇬🇧 GBP</h4><div class="value">£ ${s.totalGBP.toFixed(2)}</div><div class="sub">≈ R$ ${s.gbpEmBRL.toFixed(2)}</div></div>
             <div class="summary-card"><h4>🇧🇷 BRL direto</h4><div class="value">R$ ${s.totalBRL.toFixed(2)}</div></div>
@@ -201,39 +331,15 @@
             <div class="summary-card"><h4>📊 Total emprestado</h4><div class="value">R$ ${s.totalGeral.toFixed(2)}</div></div>
         `;
     }
-    function openEditModal(id) {
-        const item = transactions.find(t => t.id === id);
-        if (!item) return;
-        currentEditId = id;
-        editTipo.value = item.tipo;
-        if (item.tipo === 'emprestimo') { editMoeda.style.display = 'block'; editMoeda.value = item.moeda || 'GBP'; }
-        else { editMoeda.style.display = 'none'; }
-        editValor.value = item.valor;
-        editDesc.value = item.descricao || '';
-        editData.value = item.data;
-        editModal.style.display = 'flex';
-    }
-    function saveEdit() {
-        if (!currentEditId) return;
-        const index = transactions.findIndex(t => t.id === currentEditId);
-        if (index === -1) return;
-        const novoTipo = editTipo.value;
-        const novoValor = parseFloat(editValor.value);
-        if (isNaN(novoValor) || novoValor <= 0) { alert('Valor inválido!'); return; }
-        transactions[index].tipo = novoTipo;
-        transactions[index].valor = novoValor;
-        transactions[index].descricao = editDesc.value;
-        transactions[index].data = editData.value;
-        if (novoTipo === 'emprestimo') { transactions[index].moeda = editMoeda.value; }
-        else { delete transactions[index].moeda; }
-        saveToLocal(); renderAll(); closeModal(); alert('✅ Registro editado!');
-    }
-    function closeModal() { editModal.style.display = 'none'; currentEditId = null; }
+    
     function renderTable() {
-        if (!transactions.length) { transactionsBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">✨ Nenhum registro ✨</td></tr>'; return; }
-        const sorted = [...transactions].sort((a, b) => new Date(b.data) - new Date(a.data));
+        if (!transactionsBody) return;
+        if (!transactions.length) {
+            transactionsBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">✨ Nenhum registro ✨</td><tr>';
+            return;
+        }
         let html = '';
-        for (let t of sorted) {
+        for (let t of transactions) {
             let tipoStr, valorStr, badgeClass;
             if (t.tipo === 'emprestimo') {
                 const sym = t.moeda === 'GBP' ? '£' : 'R$';
@@ -245,72 +351,176 @@
                 tipoStr = `💳 PAG`;
                 badgeClass = 'badge-pagamento';
             }
-            html += `<tr><td><span class="badge-type ${badgeClass}">${tipoStr}</span></td><td><strong>${valorStr}</strong></td><td>${escapeHtml(t.descricao || '-')}</td><td>${t.data}</td><td class="action-icons"><button class="edit-btn" data-id="${t.id}">✏️</button><button class="delete-btn" data-id="${t.id}">🗑️</button></td></tr>`;
+            html += `<tr>
+                <td><span class="badge-type ${badgeClass}">${tipoStr}</span></td>
+                <td><strong>${valorStr}</strong></td>
+                <td>${escapeHtml(t.descricao || '-')}</td>
+                <td>${t.data}</td>
+                <td class="action-icons">
+                    <button class="edit-btn" data-id="${t.id}">✏️</button>
+                    <button class="delete-btn" data-id="${t.id}">🗑️</button>
+                </td>
+            </tr>`;
         }
         transactionsBody.innerHTML = html;
-        document.querySelectorAll('.edit-btn').forEach(btn => { btn.addEventListener('click', (e) => { openEditModal(btn.getAttribute('data-id')); }); });
-        document.querySelectorAll('.delete-btn').forEach(btn => { btn.addEventListener('click', (e) => { transactions = transactions.filter(t => t.id !== btn.getAttribute('data-id')); saveToLocal(); renderAll(); }); });
+        
+        document.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => openEditModal(btn.getAttribute('data-id')));
+        });
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const id = btn.getAttribute('data-id');
+                await deleteTransactionFromCloud(id);
+            });
+        });
     }
+    
     function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
+    
     function renderAll() { renderSummary(); renderTable(); }
-    function addEmprestimo() {
+    
+    async function addEmprestimo() {
         const moeda = document.getElementById('loanCurrency').value;
         const valor = parseFloat(document.getElementById('loanAmount').value);
         if (isNaN(valor) || valor <= 0) return alert('Valor válido');
         const desc = document.getElementById('loanDesc').value.trim();
         let data = document.getElementById('loanDate').value;
         if (!data) data = new Date().toISOString().slice(0,10);
-        transactions.push({ id: Date.now() + '-' + Math.random().toString(36).substr(2,6), tipo: 'emprestimo', moeda, valor, descricao: desc || `Empréstimo em ${moeda}`, data });
-        saveToLocal();
+        
+        await addTransaction({
+            tipo: 'emprestimo',
+            moeda: moeda,
+            valor: valor,
+            descricao: desc || `Empréstimo em ${moeda}`,
+            data: data
+        });
+        
         document.getElementById('loanAmount').value = '';
         document.getElementById('loanDesc').value = '';
-        renderAll();
     }
-    function addPagamento() {
+    
+    async function addPagamento() {
         const valor = parseFloat(document.getElementById('paymentAmount').value);
         if (isNaN(valor) || valor <= 0) return alert('Valor válido em Reais');
         const desc = document.getElementById('paymentDesc').value.trim();
         let data = document.getElementById('paymentDate').value;
         if (!data) data = new Date().toISOString().slice(0,10);
-        transactions.push({ id: Date.now() + '-' + Math.random().toString(36).substr(2,6), tipo: 'pagamento', valor, descricao: desc || `Pagamento de R$ ${valor}`, data });
-        saveToLocal();
+        
+        await addTransaction({
+            tipo: 'pagamento',
+            valor: valor,
+            descricao: desc || `Pagamento de R$ ${valor}`,
+            data: data
+        });
+        
         document.getElementById('paymentAmount').value = '';
         document.getElementById('paymentDesc').value = '';
+    }
+    
+    function openEditModal(id) {
+        const item = transactions.find(t => t.id === id);
+        if (!item) return;
+        currentEditId = id;
+        document.getElementById('editTipo').value = item.tipo;
+        if (item.tipo === 'emprestimo') {
+            document.getElementById('editMoeda').style.display = 'block';
+            document.getElementById('editMoeda').value = item.moeda || 'GBP';
+        } else {
+            document.getElementById('editMoeda').style.display = 'none';
+        }
+        document.getElementById('editValor').value = item.valor;
+        document.getElementById('editDesc').value = item.descricao || '';
+        document.getElementById('editData').value = item.data;
+        editModal.style.display = 'flex';
+    }
+    
+    async function saveEdit() {
+        if (!currentEditId) return;
+        const novoTipo = document.getElementById('editTipo').value;
+        const novoValor = parseFloat(document.getElementById('editValor').value);
+        if (isNaN(novoValor) || novoValor <= 0) { alert('Valor inválido!'); return; }
+        
+        const updates = {
+            tipo: novoTipo,
+            valor: novoValor,
+            descricao: document.getElementById('editDesc').value,
+            data: document.getElementById('editData').value
+        };
+        
+        if (novoTipo === 'emprestimo') {
+            updates.moeda = document.getElementById('editMoeda').value;
+        } else {
+            updates.moeda = null;
+        }
+        
+        await updateTransaction(currentEditId, updates);
+        closeModal();
+        alert('✅ Registro editado na nuvem!');
+    }
+    
+    function closeModal() { editModal.style.display = 'none'; currentEditId = null; }
+    
+    async function updateExchange() {
+        let newRate = parseFloat(exchangeRateInput.value);
+        if (isNaN(newRate) || newRate <= 0) return alert('Taxa inválida');
+        exchangeRate = newRate;
+        await saveExchangeRate(exchangeRate);
         renderAll();
     }
-    function clearAll() { if (confirm('⚠️ Apagar TODOS os dados? Faça backup primeiro!')) { transactions = []; saveToLocal(); renderAll(); } }
-    function updateExchange() { let newRate = parseFloat(exchangeRateInput.value); if (isNaN(newRate) || newRate <= 0) return alert('Taxa inválida'); exchangeRate = newRate; saveToLocal(); renderAll(); }
-    function gerarRelatorioCompleto() {
-        const s = getStats();
-        let texto = "🌸 ACERTO ROSA VIAGEM 🌸\n📅 "+new Date().toLocaleDateString('pt-BR')+"\n\n📊 RESUMO:\n💰 GBP: £ "+s.totalGBP.toFixed(2)+" (≈ R$ "+s.gbpEmBRL.toFixed(2)+")\n💰 BRL direto: R$ "+s.totalBRL.toFixed(2)+"\n📥 Pago ao cunhado: R$ "+s.totalPago.toFixed(2)+"\n⚖️ SALDO DEVEDOR: R$ "+s.saldo.toFixed(2)+"\n\n📋 HISTÓRICO:\n";
-        if (transactions.length === 0) texto += "Nenhum registro";
-        else for (let t of transactions) { if (t.tipo === 'emprestimo') { texto += `🔹 EMPRÉSTIMO (${t.moeda}): ${t.moeda === 'GBP' ? '£' : 'R$'} ${t.valor.toFixed(2)} | ${t.descricao} | ${t.data}\n`; } else { texto += `🔸 PAGAMENTO: R$ ${t.valor.toFixed(2)} | ${t.descricao} | ${t.data}\n`; } }
-        return texto;
+    
+    async function manualSync() {
+        if (currentUser) {
+            updateSyncStatus('🔄 Sincronizando...');
+            await loadUserData();
+        }
     }
-    function enviarWhatsApp() { window.open(`https://wa.me/?text=${encodeURIComponent(gerarRelatorioCompleto())}`, '_blank'); }
-    function imprimir() {
-        const s = getStats();
-        let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório Acerto Rosa</title><style>body{font-family:sans-serif;margin:2rem;}h1{color:#be185d;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #fbcfe8;padding:6px;}</style></head><body><h1>🌸 Acerto Rosa Viagem</h1><p>Data: ${new Date().toLocaleDateString('pt-BR')} | Taxa GBP: ${exchangeRate}</p><div style="background:#fef2f8;padding:1rem;border-radius:12px;"><strong>📊 RESUMO</strong><br>🇬🇧 GBP: £ ${s.totalGBP.toFixed(2)} (≈ R$ ${s.gbpEmBRL.toFixed(2)})<br>🇧🇷 BRL direto: R$ ${s.totalBRL.toFixed(2)}<br>💸 Pago: R$ ${s.totalPago.toFixed(2)}<br><strong>⚖️ SALDO: R$ ${s.saldo.toFixed(2)}</strong></div><h3>📋 Histórico</h3><table><tr><th>Tipo</th><th>Valor</th><th>Descrição</th><th>Data</th></tr>`;
-        for (let t of transactions) { let tipo = t.tipo === 'emprestimo' ? `Empréstimo ${t.moeda}` : 'Pagamento'; let valor = t.tipo === 'emprestimo' ? (t.moeda === 'GBP' ? `£ ${t.valor.toFixed(2)}` : `R$ ${t.valor.toFixed(2)}`) : `R$ ${t.valor.toFixed(2)}`; html += `<tr><td>${tipo}</td><td>${valor}</td><td>${t.descricao || ''}</td><td>${t.data}</td></tr>`; }
-        html += `</table></body></html>`; const win = window.open(); win.document.write(html); win.document.close(); win.print();
-    }
-    (function init() {
-        loadData();
+    
+    // Inicialização
+    async function init() {
         const today = new Date().toISOString().slice(0,10);
-        if (!document.getElementById('loanDate').value) document.getElementById('loanDate').value = today;
-        if (!document.getElementById('paymentDate').value) document.getElementById('paymentDate').value = today;
-        document.getElementById('addLoanBtn').onclick = addEmprestimo;
-        document.getElementById('addPaymentBtn').onclick = addPagamento;
-        document.getElementById('clearAllBtn').onclick = clearAll;
-        document.getElementById('applyRateBtn').onclick = updateExchange;
-        document.getElementById('whatsappBtn').onclick = enviarWhatsApp;
-        document.getElementById('printBtn').onclick = imprimir;
-        document.getElementById('backupBtn').onclick = backupData;
-        document.getElementById('restoreFile').onchange = (e) => { if(e.target.files[0]) restoreFromFile(e.target.files[0]); e.target.value = ''; };
-        document.getElementById('saveEditBtn').onclick = saveEdit;
-        document.getElementById('cancelEditBtn').onclick = closeModal;
-        editTipo.onchange = function() { editMoeda.style.display = this.value === 'emprestimo' ? 'block' : 'none'; };
-    })();
+        if (document.getElementById('loanDate')) document.getElementById('loanDate').value = today;
+        if (document.getElementById('paymentDate')) document.getElementById('paymentDate').value = today;
+        
+        document.getElementById('addLoanBtn')?.addEventListener('click', addEmprestimo);
+        document.getElementById('addPaymentBtn')?.addEventListener('click', addPagamento);
+        document.getElementById('applyRateBtn')?.addEventListener('click', updateExchange);
+        document.getElementById('loginBtn')?.addEventListener('click', loginWithGoogle);
+        document.getElementById('logoutBtn')?.addEventListener('click', logout);
+        document.getElementById('syncBtn')?.addEventListener('click', manualSync);
+        document.getElementById('saveEditBtn')?.addEventListener('click', saveEdit);
+        document.getElementById('cancelEditBtn')?.addEventListener('click', closeModal);
+        
+        // Verificar sessão atual
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            currentUser = session.user;
+            showAppScreen();
+            await loadUserData();
+        } else {
+            showLoginScreen();
+        }
+        
+        // Ouvir mudanças de autenticação
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            if (session) {
+                currentUser = session.user;
+                showAppScreen();
+                await loadUserData();
+            } else {
+                currentUser = null;
+                transactions = [];
+                showLoginScreen();
+                renderTable();
+                renderSummary();
+            }
+        });
+        
+        document.getElementById('editTipo')?.addEventListener('change', function() {
+            document.getElementById('editMoeda').style.display = this.value === 'emprestimo' ? 'block' : 'none';
+        });
+    }
+    
+    init();
 </script>
 </body>
 </html>

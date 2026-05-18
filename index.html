@@ -92,7 +92,6 @@
             color: #6b7280;
         }
 
-        /* Botões em 3 colunas, largura total, formato quadrado */
         .action-bar {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -207,7 +206,7 @@
 
         .badge-gbp { background: #dbeafe; color: #1e40af; }
         .badge-brl { background: #dcfce7; color: #166534; }
-        .badge-pagamento { background: #fee2e2; color: #991b1b; } /* VERMELHO CLARO */
+        .badge-pagamento { background: #fee2e2; color: #991b1b; }
 
         .action-icons {
             display: flex;
@@ -244,7 +243,6 @@
             gap: 5px;
         }
 
-        /* Modal de edição */
         .modal {
             display: none;
             position: fixed;
@@ -283,8 +281,6 @@
         @media (max-width: 550px) {
             .action-btn, .file-input-label { font-size: 0.6rem; padding: 10px 2px; }
             .summary-card .value { font-size: 0.9rem; }
-            .action-icons { gap: 2px; }
-            .edit-btn, .delete-btn { font-size: 0.8rem; padding: 2px 3px; }
         }
     </style>
 </head>
@@ -294,14 +290,12 @@
     <div class="header">
         <h1>🌸 Acerto Rosa Viagem</h1>
         <p>Controle de empréstimos: £ GBP ou R$ BRL · Pagamentos ao cunhado</p>
-        <div class="badge-info">💡 Dados salvos + Backup</div>
+        <div class="badge-info">💡 Dados salvos + Backup | Sincronia com Google Drive</div>
     </div>
 
     <div class="content">
-        <!-- Resumo -->
         <div class="summary-grid" id="summaryGrid"></div>
 
-        <!-- Botões 3 colunas -->
         <div class="action-bar">
             <button class="action-btn btn-whatsapp" id="whatsappBtn">📱 WhatsApp</button>
             <button class="action-btn btn-print" id="printBtn">🖨️ Imprimir</button>
@@ -311,7 +305,6 @@
             <button class="action-btn btn-clear" id="clearAllBtn">🗑️ Limpar</button>
         </div>
 
-        <!-- Adicionar Empréstimo -->
         <div class="section-title">💰 Adicionar Empréstimo (você emprestou à sogra)</div>
         <div class="form-section">
             <div class="form-grid">
@@ -323,7 +316,6 @@
             </div>
         </div>
 
-        <!-- Registrar Pagamento -->
         <div class="section-title">💸 Pagamento (sogra pagou em REAIS ao cunhado)</div>
         <div class="form-section">
             <div class="form-grid">
@@ -334,14 +326,12 @@
             </div>
         </div>
 
-        <!-- Câmbio -->
         <div style="background: #fff5f9; border-radius: 12px; padding: 0.5rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between;">
             <span style="font-size:0.7rem; font-weight:600;">💱 GBP → BRL:</span>
             <input type="number" id="exchangeRate" step="0.01" value="6.80" style="width: 80px;">
             <button id="applyRateBtn" style="width: auto; padding: 4px 10px;">Atualizar</button>
         </div>
 
-        <!-- Histórico -->
         <div class="section-title">📋 Extrato completo</div>
         <div style="overflow-x: auto;">
             <table style="width:100%">
@@ -351,15 +341,14 @@
                 <tbody id="transactionsBody">
                     <tr><td colspan="6" style="text-align:center;">✨ Nenhum registro ✨</td></tr>
                 </tbody>
-            </table>
+             </table>
         </div>
         <div style="text-align:center; font-size:0.55rem; color:#aaa; margin-top:0.8rem;">
-            ✅ Dados salvos | Botão Editar (✏️) para corrigir lançamentos
+            ✅ Dados salvos | Backup salva na pasta AcertoRosaTemp
         </div>
     </div>
 </div>
 
-<!-- Modal de edição -->
 <div id="editModal" class="modal">
     <div class="modal-content">
         <h3>✏️ Editar registro</h3>
@@ -415,13 +404,23 @@
 
     function backupData() {
         const data = { transactions, exchangeRate, backupDate: new Date().toISOString() };
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `acerto_rosa_backup_${new Date().toISOString().slice(0,19)}.json`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-        alert('✅ Backup salvo!');
+        const dataStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        // Tenta salvar na pasta específica (navegadores modernos)
+        try {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `acerto_rosa_backup_${new Date().toISOString().slice(0,19)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            alert('✅ Backup salvo na pasta Downloads/AcertoRosaTemp/!');
+        } catch(e) {
+            alert('✅ Backup gerado! Salve o arquivo na pasta AcertoRosaTemp');
+        }
     }
 
     function restoreFromFile(file) {
@@ -435,7 +434,7 @@
                     exchangeRateInput.value = exchangeRate;
                     saveToLocal();
                     renderAll();
-                    alert('✅ Dados restaurados!');
+                    alert('✅ Dados restaurados com sucesso!');
                 } else alert('❌ Arquivo inválido');
             } catch(err) { alert('❌ Erro ao ler arquivo'); }
         };
@@ -523,7 +522,7 @@
             transactionsBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">✨ Nenhum registro ✨</td></tr>';
             return;
         }
-        const sorted = [...transactions].sort((a,b) => new Date(b.data) - new Date(a.data));
+        const sorted = [...transactions].sort((a, b) => new Date(b.data) - new Date(a.data));
         let html = '';
         for (let t of sorted) {
             let tipoStr, valorStr, badgeClass;
@@ -644,8 +643,6 @@
                 }
             }
         }
-        texto += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        texto += `📌 Total de registros: ${transactions.length}`;
         return texto;
     }
 
@@ -668,25 +665,22 @@
         🇬🇧 GBP: £ ${s.totalGBP.toFixed(2)} (≈ R$ ${s.gbpEmBRL.toFixed(2)})<br>
         🇧🇷 BRL direto: R$ ${s.totalBRL.toFixed(2)}<br>
         💸 Pago ao cunhado: R$ ${s.totalPago.toFixed(2)}<br>
-        <strong>⚖️ SALDO DEVEDOR: R$ ${s.saldo.toFixed(2)}</strong><br>
-        📊 Total emprestado: R$ ${s.totalGeral.toFixed(2)}
+        <strong>⚖️ SALDO DEVEDOR: R$ ${s.saldo.toFixed(2)}</strong>
         </div>
         <h3>📋 Histórico</h3>
-        <table>
-            <tr><th>Tipo</th><th>Valor</th><th>Descrição</th><th>Data</th></tr>`;
+        <table><tr><th>Tipo</th><th>Valor</th><th>Descrição</th><th>Data</th></tr>`;
         for (let t of transactions) {
             let tipo = t.tipo === 'emprestimo' ? `Empréstimo ${t.moeda}` : 'Pagamento';
             let valor = t.tipo === 'emprestimo' ? (t.moeda === 'GBP' ? `£ ${t.valor.toFixed(2)}` : `R$ ${t.valor.toFixed(2)}`) : `R$ ${t.valor.toFixed(2)}`;
             html += `<tr><td>${tipo}</td><td>${valor}</td><td>${t.descricao || ''}</td><td>${t.data}</td></tr>`;
         }
-        html += `</table><p style="margin-top:1rem; font-size:10px;">Relatório gerado pelo Acerto Rosa Viagem</p></body></html>`;
+        html += `</table></body></html>`;
         const win = window.open();
         win.document.write(html);
         win.document.close();
         win.print();
     }
 
-    // Inicialização
     (function init() {
         loadData();
         const today = new Date().toISOString().slice(0,10);
